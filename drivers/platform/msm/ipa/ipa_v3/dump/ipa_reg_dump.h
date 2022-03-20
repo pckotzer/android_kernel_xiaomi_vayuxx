@@ -15,7 +15,7 @@
 #include <linux/types.h>
 #include <linux/string.h>
 
-#include "ipa_i.h"
+#include "../../drivers/platform/msm/ipa/ipa_v3/ipa_i.h"
 
 #include "ipa_pkt_cntxt.h"
 #include "ipa_hw_common_ex.h"

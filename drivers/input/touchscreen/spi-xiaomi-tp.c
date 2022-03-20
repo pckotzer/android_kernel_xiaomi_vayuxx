@@ -1,4 +1,4 @@
-#include <spi-xiaomi-tp.h>
+#include <../../drivers/input/touchscreen/spi-xiaomi-tp.h>
 
 #define DEBUG
 

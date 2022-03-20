@@ -38,7 +38,7 @@
 #include <uapi/scsi/ufs/ufs.h>
 
 #include "ufsfeature.h"
-#include "ufshcd.h"
+#include "../drivers/scsi/ufs/ufshcd.h"
 
 #if defined(CONFIG_UFSHPB)
 #include "ufshpb.h"

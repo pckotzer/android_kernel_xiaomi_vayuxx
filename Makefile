@@ -425,6 +425,9 @@ KBUILD_CFLAGS   := -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs -pipe \
 		   -fno-strict-aliasing -fno-common -fshort-wchar \
 		   -Werror-implicit-function-declaration \
 		   -Wno-format-security \
+		   -Wno-strlcpy-strlcat-size -Wno-excess-initializers -Wno-unused-variable \
+		   -Wno-void-pointer-to-int-cast -Wno-fortify-source -Wno-declaration-after-statement \
+		   -Wno-pointer-to-int-cast -Wno-macro-redefined \
 		   -std=gnu89
 ifeq ($(TARGET_BOARD_TYPE),auto)
 KBUILD_CFLAGS    += -DCONFIG_PLATFORM_AUTO

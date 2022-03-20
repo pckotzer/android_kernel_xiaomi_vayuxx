@@ -38,7 +38,7 @@
 #include <uapi/scsi/ufs/ufs.h>
 
 #include "ufsfeature.h"
-#include "ufshcd.h"
+#include "../drivers/scsi/ufs/ufshcd.h"
 
 #define QUERY_REQ_TIMEOUT				1500 /* msec */
 
