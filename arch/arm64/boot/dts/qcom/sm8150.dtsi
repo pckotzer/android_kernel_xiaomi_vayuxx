@@ -550,7 +550,7 @@
 	};
 
 	chosen {
-		bootargs = "quiet noirqdebug nodebugmon rcupdate.rcu_normal_after_boot=1 rcu_nocbs=0-7 cgroup.memory=nokmem,nosocket kpti=off printk.devkmsg=on";
+		bootargs = "quiet rcu_nocbs=0-7 cgroup.memory=nokmem,nosocket noirqdebug nodebugmon kpti=off printk.devkmsg=on nosoftlockup mce=ignore_ce";
 	};
 
 	soc: soc { };
@@ -569,7 +569,7 @@
 					dev = "/dev/block/platform/soc/8804000.sdhci/by-name/vendor";
 					type = "ext4";
 					mnt_flags = "ro,barrier=1,discard";
-					fsmgr_flags = "wait,avb";
+					fsmgr_flags = "wait";
 					status = "ok";
 				};
 			};
@@ -701,6 +701,12 @@
 			reusable;
 			alignment = <0x0 0x400000>;
 			size = <0x0 0x1000000>;
+		};
+
+		ramoops: ramoops@b0000000 {
+			compatible = "removed-dma-pool", "ramoops";
+			no-map;
+			reg = <0 0xb0000000 0 0x400000>;
 		};
 
 		cdsp_mem: cdsp_region {
@@ -1841,7 +1847,6 @@
 		qcom,bark-time = <11000>;
 		qcom,pet-time = <9360>;
 		qcom,ipi-ping;
-		qcom,wakeup-enable;
 		qcom,scandump-sizes = <0x10100 0x10100 0x10100 0x10100
 		0x18100 0x18100 0x18100 0x18100>;
 	};

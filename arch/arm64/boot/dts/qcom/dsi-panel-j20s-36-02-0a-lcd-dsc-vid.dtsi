@@ -39,7 +39,6 @@
 		qcom,mdss-dsi-bl-min-level = <2>;
 		qcom,mdss-dsi-bl-max-level = <4095>;
 		qcom,mdss-brightness-max-level = <4095>;
-		qcom,ulps-enabled;
 		qcom,mdss-dsi-reset-sequence = <1 5>, <0 1>, <1 10>;
 		qcom,mdss-pan-physical-width-dimension = <70>;
 		qcom,mdss-pan-physical-height-dimension = <154>;
@@ -55,8 +54,13 @@
 		qcom,mdss-dsi-pan-enable-dynamic-fps;
 		qcom,mdss-dsi-pan-fps-update =
 			"dfps_immediate_porch_mode_vfp";
-		qcom,dsi-supported-dfps-list = <120 90 60 50 48 30>;
+		qcom,dsi-supported-dfps-list = <120 90 60>;
 		qcom,dispparam-enabled;
+		
+		qcom,ulps-enabled;
+		qcom,suspend-ulps-enabled;
+		qcom,panel-allow-phy-poweroff;
+		
 		qcom,mdss-dsi-display-timings {
 			timing@0{
 				qcom,mdss-dsi-panel-framerate = <120>;

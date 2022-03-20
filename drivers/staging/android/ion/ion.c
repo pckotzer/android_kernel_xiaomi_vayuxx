@@ -34,7 +34,6 @@
 #include <linux/seq_file.h>
 #include <linux/uaccess.h>
 #include <linux/vmalloc.h>
-#include <linux/debugfs.h>
 #include <linux/dma-buf.h>
 #include <linux/idr.h>
 #include <linux/sched/task.h>
@@ -118,6 +117,8 @@ static struct ion_buffer *ion_buffer_create(struct ion_heap *heap,
 	if (!buffer)
 		return ERR_PTR(-ENOMEM);
 
+	INIT_LIST_HEAD(&buffer->iommu_data.map_list);
+	mutex_init(&buffer->iommu_data.lock);
 	buffer->heap = heap;
 	buffer->flags = flags;
 
@@ -198,7 +199,7 @@ static void _ion_buffer_destroy(struct ion_buffer *buffer)
 	struct ion_heap *heap = buffer->heap;
 	struct ion_device *dev = buffer->dev;
 
-	msm_dma_buf_freed(buffer);
+	msm_dma_buf_freed(&buffer->iommu_data);
 
 	mutex_lock(&dev->buffer_lock);
 	rb_erase(&buffer->node, &dev->buffers);
@@ -291,7 +292,8 @@ static int ion_dma_buf_attach(struct dma_buf *dmabuf, struct device *dev,
 {
 	struct ion_dma_buf_attachment *a;
 	struct sg_table *table;
-	struct ion_buffer *buffer = dmabuf->priv;
+	struct ion_buffer *buffer = container_of(dmabuf->priv, typeof(*buffer),
+						 iommu_data);
 
 	a = kzalloc(sizeof(*a), GFP_KERNEL);
 	if (!a)
@@ -321,7 +323,8 @@ static void ion_dma_buf_detatch(struct dma_buf *dmabuf,
 				struct dma_buf_attachment *attachment)
 {
 	struct ion_dma_buf_attachment *a = attachment->priv;
-	struct ion_buffer *buffer = dmabuf->priv;
+	struct ion_buffer *buffer = container_of(dmabuf->priv, typeof(*buffer),
+						 iommu_data);
 
 	mutex_lock(&buffer->lock);
 	list_del(&a->list);
@@ -338,7 +341,8 @@ static struct sg_table *ion_map_dma_buf(struct dma_buf_attachment *attachment,
 	struct ion_dma_buf_attachment *a = attachment->priv;
 	struct sg_table *table;
 	int count, map_attrs;
-	struct ion_buffer *buffer = attachment->dmabuf->priv;
+	struct ion_buffer *buffer = container_of(attachment->dmabuf->priv,
+						 typeof(*buffer), iommu_data);
 
 	table = a->table;
 
@@ -388,7 +392,8 @@ static void ion_unmap_dma_buf(struct dma_buf_attachment *attachment,
 			      enum dma_data_direction direction)
 {
 	int map_attrs;
-	struct ion_buffer *buffer = attachment->dmabuf->priv;
+	struct ion_buffer *buffer = container_of(attachment->dmabuf->priv,
+						 typeof(*buffer), iommu_data);
 	struct ion_dma_buf_attachment *a = attachment->priv;
 
 	map_attrs = attachment->dma_map_attrs;
@@ -477,7 +482,8 @@ static const struct vm_operations_struct ion_vma_ops = {
 
 static int ion_mmap(struct dma_buf *dmabuf, struct vm_area_struct *vma)
 {
-	struct ion_buffer *buffer = dmabuf->priv;
+	struct ion_buffer *buffer = container_of(dmabuf->priv, typeof(*buffer),
+						 iommu_data);
 	int ret = 0;
 
 	if (!buffer->heap->ops->map_user) {
@@ -507,7 +513,8 @@ static int ion_mmap(struct dma_buf *dmabuf, struct vm_area_struct *vma)
 
 static void ion_dma_buf_release(struct dma_buf *dmabuf)
 {
-	struct ion_buffer *buffer = dmabuf->priv;
+	struct ion_buffer *buffer = container_of(dmabuf->priv, typeof(*buffer),
+						 iommu_data);
 
 	_ion_buffer_destroy(buffer);
 	kfree(dmabuf->exp_name);
@@ -515,7 +522,8 @@ static void ion_dma_buf_release(struct dma_buf *dmabuf)
 
 static void *ion_dma_buf_vmap(struct dma_buf *dmabuf)
 {
-	struct ion_buffer *buffer = dmabuf->priv;
+	struct ion_buffer *buffer = container_of(dmabuf->priv, typeof(*buffer),
+						 iommu_data);
 	void *vaddr = ERR_PTR(-EINVAL);
 
 	if (buffer->heap->ops->map_kernel) {
@@ -532,7 +540,8 @@ static void *ion_dma_buf_vmap(struct dma_buf *dmabuf)
 
 static void ion_dma_buf_vunmap(struct dma_buf *dmabuf, void *vaddr)
 {
-	struct ion_buffer *buffer = dmabuf->priv;
+	struct ion_buffer *buffer = container_of(dmabuf->priv, typeof(*buffer),
+						 iommu_data);
 
 	if (buffer->heap->ops->map_kernel) {
 		mutex_lock(&buffer->lock);
@@ -648,7 +657,8 @@ static int __ion_dma_buf_begin_cpu_access(struct dma_buf *dmabuf,
 					  enum dma_data_direction direction,
 					  bool sync_only_mapped)
 {
-	struct ion_buffer *buffer = dmabuf->priv;
+	struct ion_buffer *buffer = container_of(dmabuf->priv, typeof(*buffer),
+						 iommu_data);
 	struct ion_dma_buf_attachment *a;
 	int ret = 0;
 
@@ -745,7 +755,8 @@ static int __ion_dma_buf_end_cpu_access(struct dma_buf *dmabuf,
 					enum dma_data_direction direction,
 					bool sync_only_mapped)
 {
-	struct ion_buffer *buffer = dmabuf->priv;
+	struct ion_buffer *buffer = container_of(dmabuf->priv, typeof(*buffer),
+						 iommu_data);
 	struct ion_dma_buf_attachment *a;
 	int ret = 0;
 
@@ -862,7 +873,8 @@ static int ion_dma_buf_begin_cpu_access_partial(struct dma_buf *dmabuf,
 						unsigned int offset,
 						unsigned int len)
 {
-	struct ion_buffer *buffer = dmabuf->priv;
+	struct ion_buffer *buffer = container_of(dmabuf->priv, typeof(*buffer),
+						 iommu_data);
 	struct ion_dma_buf_attachment *a;
 	int ret = 0;
 
@@ -944,7 +956,8 @@ static int ion_dma_buf_end_cpu_access_partial(struct dma_buf *dmabuf,
 					      unsigned int offset,
 					      unsigned int len)
 {
-	struct ion_buffer *buffer = dmabuf->priv;
+	struct ion_buffer *buffer = container_of(dmabuf->priv, typeof(*buffer),
+						 iommu_data);
 	struct ion_dma_buf_attachment *a;
 	int ret = 0;
 
@@ -1024,7 +1037,8 @@ out:
 static int ion_dma_buf_get_flags(struct dma_buf *dmabuf,
 				 unsigned long *flags)
 {
-	struct ion_buffer *buffer = dmabuf->priv;
+	struct ion_buffer *buffer = container_of(dmabuf->priv, typeof(*buffer),
+						 iommu_data);
 	*flags = buffer->flags;
 
 	return 0;
@@ -1097,7 +1111,7 @@ struct dma_buf *ion_alloc_dmabuf(size_t len, unsigned int heap_id_mask,
 	exp_info.ops = &dma_buf_ops;
 	exp_info.size = buffer->size;
 	exp_info.flags = O_RDWR;
-	exp_info.priv = buffer;
+	exp_info.priv = &buffer->iommu_data;
 	exp_info.exp_name = kasprintf(GFP_KERNEL, "%s-%s-%d-%s", KBUILD_MODNAME,
 				      heap->name, current->tgid, task_comm);
 
@@ -1221,45 +1235,8 @@ static const struct file_operations ion_fops = {
 #endif
 };
 
-static int debug_shrink_set(void *data, u64 val)
-{
-	struct ion_heap *heap = data;
-	struct shrink_control sc;
-	int objs;
-
-	sc.gfp_mask = GFP_HIGHUSER;
-	sc.nr_to_scan = val;
-
-	if (!val) {
-		objs = heap->shrinker.count_objects(&heap->shrinker, &sc);
-		sc.nr_to_scan = objs;
-	}
-
-	heap->shrinker.scan_objects(&heap->shrinker, &sc);
-	return 0;
-}
-
-static int debug_shrink_get(void *data, u64 *val)
-{
-	struct ion_heap *heap = data;
-	struct shrink_control sc;
-	int objs;
-
-	sc.gfp_mask = GFP_HIGHUSER;
-	sc.nr_to_scan = 0;
-
-	objs = heap->shrinker.count_objects(&heap->shrinker, &sc);
-	*val = objs;
-	return 0;
-}
-
-DEFINE_SIMPLE_ATTRIBUTE(debug_shrink_fops, debug_shrink_get,
-			debug_shrink_set, "%llu\n");
-
 void ion_device_add_heap(struct ion_device *dev, struct ion_heap *heap)
 {
-	struct dentry *debug_file;
-
 	if (!heap->ops->allocate || !heap->ops->free)
 		pr_err("%s: can not add heap with invalid ops struct.\n",
 		       __func__);
@@ -1281,22 +1258,6 @@ void ion_device_add_heap(struct ion_device *dev, struct ion_heap *heap)
 	 */
 	plist_node_init(&heap->node, -heap->id);
 	plist_add(&heap->node, &dev->heaps);
-
-	if (heap->shrinker.count_objects && heap->shrinker.scan_objects) {
-		char debug_name[64];
-
-		snprintf(debug_name, 64, "%s_shrink", heap->name);
-		debug_file = debugfs_create_file(
-			debug_name, 0644, dev->debug_root, heap,
-			&debug_shrink_fops);
-		if (!debug_file) {
-			char buf[256], *path;
-
-			path = dentry_path(dev->debug_root, buf, 256);
-			pr_err("Failed to create heap shrinker debugfs at %s/%s\n",
-			       path, debug_name);
-		}
-	}
 
 	dev->heap_cnt++;
 	up_write(&dev->lock);
@@ -1377,14 +1338,6 @@ struct ion_device *ion_device_create(void)
 		pr_err("ion: failed to add sysfs attributes.\n");
 		goto err_sysfs;
 	}
-
-	idev->debug_root = debugfs_create_dir("ion", NULL);
-	if (!idev->debug_root) {
-		pr_err("ion: failed to create debugfs root directory.\n");
-		goto debugfs_done;
-	}
-
-debugfs_done:
 
 	idev->buffers = RB_ROOT;
 	mutex_init(&idev->buffer_lock);

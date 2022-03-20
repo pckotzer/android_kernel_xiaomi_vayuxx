@@ -59,6 +59,27 @@
 #include "../xiaomi/xiaomi_touch.h"
 #endif
 
+#undef dev_info
+#define dev_info(x, ...)
+#undef dev_dbg
+#define dev_dbg(x, ...)
+#undef dev_err
+#define dev_err(x, ...)
+#undef pr_info
+#define pr_info(x, ...)
+#undef pr_debug
+#define pr_debug(x, ...)
+#undef pr_error
+#define pr_error(x, ...)
+#undef printk
+#define printk(x, ...)
+#undef printk_deferred
+#define printk_deferred(x, ...)
+#undef NVT_LOG
+#define NVT_LOG(x, ...)
+#undef NVT_ERR
+#define NVT_ERR(x, ...)
+
 #if NVT_TOUCH_ESD_PROTECT
 static struct delayed_work nvt_esd_check_work;
 static struct workqueue_struct *nvt_esd_check_wq;
@@ -1197,8 +1218,6 @@ static int nvt_get_panel_type(struct nvt_ts_data *ts_data)
 		return ts->panel_index;
 	}
 
-	NVT_LOG("match panle type, fw is [%s], mp is [%s]",
-		panel_list[i].nvt_fw_name, panel_list[i].nvt_mp_name);
 	return ts->panel_index;
 }
 
@@ -1233,7 +1252,6 @@ void nvt_match_fw(void)
 		}
 	} else {
 		ts->fw_name = ts->config_array[ts->panel_index].nvt_fw_name;
-		ts->mp_name = ts->config_array[ts->panel_index].nvt_mp_name;
 	}
 }
 
@@ -2242,39 +2260,6 @@ static int tpdbg_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static ssize_t  nvt_touch_test_write(struct file *file, const char __user *buf,
-		size_t count, loff_t *pos){
-	int retval = -1;
-	uint8_t cmd[8];
-	if (copy_from_user(cmd, buf, count)) {
-		retval = -EFAULT;
-		goto out;
-	}
-	switch(cmd[0]) {
-		case '0':
-			ts->debug_flag = 0;
-			break;
-		case '1':
-			ts->debug_flag = 1;
-			break;
-		case '2':
-			ts->debug_flag = 2;
-			break;
-		default:
-			NVT_LOG("%s invalid input cmd, set default value\n", __func__);
-			ts->debug_flag = 2;
-	}
-	NVT_LOG("%s set touch boost debug flag to %d\n", __func__, ts->debug_flag);
-	retval = count;
-out:
-	return retval;
-}
-
-static const struct file_operations nvt_touch_test_fops = {
-	.owner = THIS_MODULE,
-	.write = nvt_touch_test_write,
-};
-
 static const struct file_operations tpdbg_ops = {
 	.owner = THIS_MODULE,
 	.open = tpdbg_open,
@@ -2399,7 +2384,6 @@ static int32_t nvt_ts_probe(struct platform_device *pdev)
 	ts->client->bits_per_word = 8;
 	ts->client->mode = SPI_MODE_0;
 	ts->client->max_speed_hz = ts->spi_max_freq;
-	ts->debug_flag = 2;
 
 	ret = spi_setup(ts->client);
 	if (ret < 0) {
@@ -2667,7 +2651,6 @@ static int32_t nvt_ts_probe(struct platform_device *pdev)
 	ts->debugfs = debugfs_create_dir("tp_debug", NULL);
 	if (ts->debugfs) {
 		debugfs_create_file("switch_state", 0660, ts->debugfs, ts, &tpdbg_ops);
-		debugfs_create_file("touch_boost", 0660, ts->debugfs, ts, &nvt_touch_test_fops);
 	}
 #endif
 	nvt_cmds_panel_info();
