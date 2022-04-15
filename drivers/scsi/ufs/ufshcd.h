@@ -1104,6 +1104,7 @@ struct ufs_hba {
 	bool force_g4;
 	/* distinguish between resume and restore */
 	bool restore;
+	bool delay_ssu;
 
 #if defined(CONFIG_UFSFEATURE)
 	struct ufsf_feature ufsf;
@@ -1128,6 +1129,7 @@ struct ufs_hba {
 	} pm_qos;
 
 	bool wb_enabled;
+	bool primary_boot_device_probed;
 };
 
 static inline void ufshcd_mark_shutdown_ongoing(struct ufs_hba *hba)

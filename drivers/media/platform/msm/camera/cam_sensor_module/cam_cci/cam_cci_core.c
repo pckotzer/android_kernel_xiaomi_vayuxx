@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2020, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -925,6 +925,7 @@ static int32_t cam_cci_burst_read(struct v4l2_subdev *sd,
 
 	soc_info = &cci_dev->soc_info;
 	base = soc_info->reg_map[0].mem_base;
+
 	/*
 	 * Call validate queue to make sure queue is empty before starting.
 	 * If this call fails, don't proceed with i2c_read call. This is to
@@ -1341,6 +1342,7 @@ static int32_t cam_cci_i2c_write(struct v4l2_subdev *sd,
 		CAM_ERR(CAM_CCI, "cam_cci_set_clk_param failed rc = %d", rc);
 		return rc;
 	}
+
 	/*
 	 * Call validate queue to make sure queue is empty before starting.
 	 * If this call fails, don't proceed with i2c_write call. This is to

@@ -68,6 +68,17 @@ static inline struct f_uac1_opts *g_audio_to_uac1_opts(struct g_audio *audio)
 /* Number of streaming interfaces */
 #define F_AUDIO_NUM_INTERFACES		2
 
+static struct usb_interface_assoc_descriptor iad_desc = {
+	.bLength = sizeof(iad_desc),
+	.bDescriptorType = USB_DT_INTERFACE_ASSOCIATION,
+
+	.bFirstInterface = 0,
+	.bInterfaceCount = 3,
+	.bFunctionClass = USB_CLASS_AUDIO,
+	.bFunctionSubClass = USB_SUBCLASS_AUDIOSTREAMING,
+	.bFunctionProtocol = UAC_VERSION_1,
+};
+
 /* B.3.1  Standard AC Interface Descriptor */
 static struct usb_interface_descriptor ac_interface_desc = {
 	.bLength =		USB_DT_INTERFACE_SIZE,
@@ -366,6 +377,7 @@ static struct uac_iso_endpoint_descriptor as_iso_in_desc = {
 };
 
 static struct usb_descriptor_header *f_audio_desc[] = {
+	(struct usb_descriptor_header *)&iad_desc,
 	(struct usb_descriptor_header *)&ac_interface_desc,
 	(struct usb_descriptor_header *)&ac_header_desc,
 
@@ -399,6 +411,7 @@ static struct usb_descriptor_header *f_audio_desc[] = {
 };
 
 static struct usb_descriptor_header *f_audio_ss_desc[] = {
+	(struct usb_descriptor_header *)&iad_desc,
 	(struct usb_descriptor_header *)&ac_interface_desc,
 	(struct usb_descriptor_header *)&ac_header_desc,
 
@@ -862,6 +875,7 @@ static int f_audio_bind(struct usb_configuration *c, struct usb_function *f)
 	if (status < 0)
 		goto fail;
 	ac_interface_desc.bInterfaceNumber = status;
+	iad_desc.bFirstInterface = status;
 	uac1->ac_intf = status;
 	uac1->ac_alt = 0;
 
@@ -886,6 +900,10 @@ static int f_audio_bind(struct usb_configuration *c, struct usb_function *f)
 	audio->gadget = gadget;
 
 	status = -ENODEV;
+
+	audio_opts->ep_maxp_size = clamp(audio_opts->ep_maxp_size, 1U, 1023U);
+	as_out_ep_desc.wMaxPacketSize = cpu_to_le16(audio_opts->ep_maxp_size);
+	as_in_ep_desc.wMaxPacketSize = cpu_to_le16(audio_opts->ep_maxp_size);
 
 	/* allocate instance-specific endpoints */
 	ep = usb_ep_autoconfig(cdev->gadget, &as_out_ep_desc);
@@ -1036,6 +1054,7 @@ UAC1_ATTRIBUTE(p_chmask);
 UAC1_ATTRIBUTE(p_srate);
 UAC1_ATTRIBUTE(p_ssize);
 UAC1_ATTRIBUTE(req_number);
+UAC1_ATTRIBUTE(ep_maxp_size);
 
 static ssize_t f_uac1_opts_speaker_volume_show(struct config_item *item,
 								char *page)
@@ -1046,6 +1065,9 @@ static ssize_t f_uac1_opts_speaker_volume_show(struct config_item *item,
 	struct usb_audio_control_selector *cs;
 	struct usb_audio_control *con;
 	int value;
+
+	if (!uac1)
+		return 0;
 
 	list_for_each_entry(cs, &uac1->cs, list) {
 		if (cs->id == FEATURE_UNIT_ID) {
@@ -1072,6 +1094,9 @@ static ssize_t f_uac1_opts_mic_volume_show(struct config_item *item, char *page)
 	struct usb_audio_control_selector *cs;
 	struct usb_audio_control *con;
 	int value;
+
+	if (!uac1)
+		return 0;
 
 	list_for_each_entry(cs, &uac1->cs, list) {
 		if (cs->id == MIC_FEATURE_UNIT_ID) {
@@ -1100,6 +1125,9 @@ static ssize_t f_uac1_opts_speaker_mute_show(struct config_item *item,
 	struct usb_audio_control *con;
 	int value;
 
+	if (!uac1)
+		return 0;
+
 	list_for_each_entry(cs, &uac1->cs, list) {
 		if (cs->id == FEATURE_UNIT_ID) {
 			list_for_each_entry(con, &cs->control, list) {
@@ -1125,6 +1153,9 @@ static ssize_t f_uac1_opts_mic_mute_show(struct config_item *item, char *page)
 	struct usb_audio_control_selector *cs;
 	struct usb_audio_control *con;
 	int value;
+
+	if (!uac1)
+		return 0;
 
 	list_for_each_entry(cs, &uac1->cs, list) {
 		if (cs->id == MIC_FEATURE_UNIT_ID) {
@@ -1160,6 +1191,7 @@ static struct configfs_attribute *f_uac1_attrs[] = {
 	&f_uac1_opts_attr_mic_volume,
 	&f_uac1_opts_attr_speaker_mute,
 	&f_uac1_opts_attr_mic_mute,
+	&f_uac1_opts_attr_ep_maxp_size,
 	NULL,
 };
 
@@ -1198,6 +1230,7 @@ static struct usb_function_instance *f_audio_alloc_inst(void)
 	opts->p_srate = UAC1_DEF_PSRATE;
 	opts->p_ssize = UAC1_DEF_PSSIZE;
 	opts->req_number = UAC1_DEF_REQ_NUM;
+	opts->ep_maxp_size = UAC1_OUT_EP_MAX_PACKET_SIZE;
 	return &opts->func_inst;
 }
 
