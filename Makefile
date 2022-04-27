@@ -445,7 +445,9 @@ KBUILD_CFLAGS	+= -mllvm -polly \
 		   -mllvm -polly-vectorizer=stripmine \
 		   -mllvm -polly-invariant-load-hoisting
 KBUILD_CFLAGS	+= -pipe -fno-pic -O3 -g0 -finline-functions
-KBUILD_CFLAGS	+= -mcpu=cortex-a55 -mtune=cortex-a55 -mcpu=cortex-a76 -mtune=cortex-a76 -march=armv8.2-a+crypto
+KBUILD_CFLAGS	+= -mcpu=cortex-a55+crc+lse+fp16+rcpc+rdma+dotprod -mtune=cortex-a55
+KBUILD_CFLAGS	+= -mcpu=cortex-a76+crc+lse+fp16+rcpc+rdma+dotprod -mtune=cortex-a76
+KBUILD_CFLAGS	+= -march=armv8.2-a+crypto
 KBUILD_CPPFLAGS := -D__KERNEL__
 KBUILD_AFLAGS_KERNEL :=
 KBUILD_CFLAGS_KERNEL :=
@@ -519,12 +521,13 @@ endif
 ifneq ($(GCC_TOOLCHAIN),)
 CLANG_FLAGS	+= --gcc-toolchain=$(GCC_TOOLCHAIN)
 endif
+CLANG_FLAGS	+= -no-integrated-as
 CLANG_FLAGS	+= -Werror=unknown-warning-option
 CLANG_FLAGS	+= $(call cc-option, -Wno-misleading-indentation)
 CLANG_FLAGS	+= $(call cc-option, -Wno-bool-operation)
 CLANG_FLAGS	+= $(call cc-option, -Wno-unsequenced)
 KBUILD_CFLAGS	+= $(CLANG_FLAGS)
-KBUILD_AFLAGS	+= $(CLANG_FLAGS) -no-integrated-as
+KBUILD_AFLAGS	+= $(CLANG_FLAGS)
 export CLANG_FLAGS
 ifeq ($(ld-name),lld)
 KBUILD_CFLAGS += -fuse-ld=lld
