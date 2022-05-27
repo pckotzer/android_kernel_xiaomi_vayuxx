@@ -25,7 +25,6 @@ ccflags-y += $(call cc-option, -fno-whole-program)
 CFLAGS_REMOVE_vgettimeofday.o = -pg -Os
 CFLAGS_vgettimeofday.o = -fPIC
 CFLAGS_vgettimeofday.o = -O3
-ccflags-y += $(DISABLE_LTO)
 ifneq ($(cc-name),clang)
 CFLAGS_vgettimeofday.o += -mcmodel=tiny
 endif
