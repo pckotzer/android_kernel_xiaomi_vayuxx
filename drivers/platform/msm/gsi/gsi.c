@@ -3021,7 +3021,7 @@ int gsi_stop_channel(unsigned long chan_hdl)
 	}
 
 	if (ctx->state == GSI_CHAN_STATE_STOP_IN_PROC) {
-		GSIERR("chan=%lu busy try again\n", chan_hdl);
+		GSIDBG("chan=%lu busy try again\n", chan_hdl);
 		res = -GSI_STATUS_AGAIN;
 		goto free_lock;
 	}
@@ -3090,7 +3090,7 @@ int gsi_stop_db_channel(unsigned long chan_hdl)
 	}
 
 	if (ctx->state == GSI_CHAN_STATE_STOP_IN_PROC) {
-		GSIERR("chan=%lu busy try again\n", chan_hdl);
+		GSIDBG("chan=%lu busy try again\n", chan_hdl);
 		res = -GSI_STATUS_AGAIN;
 		goto free_lock;
 	}
@@ -3853,7 +3853,7 @@ int gsi_config_channel_mode(unsigned long chan_hdl, enum gsi_chan_mode mode)
 		curr = GSI_CHAN_MODE_CALLBACK;
 
 	if (mode == curr) {
-		GSIERR("already in requested mode %u chan_hdl=%lu\n",
+		GSIDBG("already in requested mode %u chan_hdl=%lu\n",
 				curr, chan_hdl);
 		spin_unlock_irqrestore(&gsi_ctx->slock, flags);
 		return -GSI_STATUS_UNSUPPORTED_OP;
@@ -4600,7 +4600,7 @@ static int msm_gsi_probe(struct platform_device *pdev)
 	gsi_ctx->ipc_logbuf = ipc_log_context_create(GSI_IPC_LOG_PAGES,
 		"gsi", 0);
 	if (gsi_ctx->ipc_logbuf == NULL)
-		GSIERR("failed to create IPC log, continue...\n");
+		GSIDBG("failed to create IPC log, continue...\n");
 
 	gsi_ctx->dev = dev;
 	init_completion(&gsi_ctx->gen_ee_cmd_compl);
