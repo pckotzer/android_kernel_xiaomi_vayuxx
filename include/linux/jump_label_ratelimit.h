@@ -62,8 +62,6 @@ extern void jump_label_update_timeout(struct work_struct *work);
 						   0),			\
 	}
 
-#define static_branch_deferred_inc(x)	static_branch_inc(&(x)->key)
-
 #else	/* !HAVE_JUMP_LABEL */
 struct static_key_deferred {
 	struct static_key  key;
@@ -83,18 +81,21 @@ struct static_key_false_deferred {
 
 static inline void static_key_slow_dec_deferred(struct static_key_deferred *key)
 {
-	STATIC_KEY_CHECK_USE();
+	STATIC_KEY_CHECK_USE(key);
 	static_key_slow_dec(&key->key);
 }
 static inline void static_key_deferred_flush(void *key)
 {
-	STATIC_KEY_CHECK_USE();
+	STATIC_KEY_CHECK_USE(key);
 }
 static inline void
 jump_label_rate_limit(struct static_key_deferred *key,
 		unsigned long rl)
 {
-	STATIC_KEY_CHECK_USE();
+	STATIC_KEY_CHECK_USE(key);
 }
 #endif	/* HAVE_JUMP_LABEL */
+
+#define static_branch_deferred_inc(x)	static_branch_inc(&(x)->key)
+
 #endif	/* _LINUX_JUMP_LABEL_RATELIMIT_H */
