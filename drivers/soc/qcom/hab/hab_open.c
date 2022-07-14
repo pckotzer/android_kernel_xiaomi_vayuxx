@@ -1,4 +1,4 @@
-/* Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2016-2020, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -38,11 +38,7 @@ int hab_open_request_send(struct hab_open_request *request)
 	return physical_channel_send(request->pchan, &header, &request->xdata);
 }
 
-/*
- * called when remote sends in open-request.
- * The sanity of the arg sizebytes is ensured by its caller hab_msg_recv.
- * The sizebytes should be equal to sizeof(struct hab_open_send_data)
- */
+/* called when remote sends in open-request */
 int hab_open_request_add(struct physical_channel *pchan,
 			size_t sizebytes, int request_type)
 {
@@ -51,6 +47,12 @@ int hab_open_request_add(struct physical_channel *pchan,
 	struct hab_open_request *request;
 	struct timeval tv;
 	int irqs_disabled = irqs_disabled();
+
+	if (sizebytes > HAB_HEADER_SIZE_MASK) {
+		pr_err("pchan %s request size too large %zd\n",
+			pchan->name, sizebytes);
+		return -EINVAL;
+	}
 
 	node = kzalloc(sizeof(*node), GFP_ATOMIC);
 	if (!node)
@@ -182,11 +184,7 @@ int hab_open_listen(struct uhab_context *ctx,
 	return ret;
 }
 
-/*
- * called when receiving remote's cancel init from FE or init-ack from BE.
- * The sanity of the arg sizebytes is ensured by its caller hab_msg_recv.
- * The sizebytes should be equal to sizeof(struct hab_open_send_data)
- */
+/* called when receives remote's cancel init from FE or init-ack from BE */
 int hab_open_receive_cancel(struct physical_channel *pchan,
 		size_t sizebytes)
 {
@@ -197,6 +195,12 @@ int hab_open_receive_cancel(struct physical_channel *pchan,
 	int bfound = 0;
 	struct timeval tv;
 	int irqs_disabled = irqs_disabled();
+
+	if (sizebytes > HAB_HEADER_SIZE_MASK) {
+		pr_err("pchan %s cancel size too large %zd\n",
+			pchan->name, sizebytes);
+		return -EINVAL;
+	}
 
 	if (physical_channel_read(pchan, &data, sizebytes) != sizebytes)
 		return -EIO;

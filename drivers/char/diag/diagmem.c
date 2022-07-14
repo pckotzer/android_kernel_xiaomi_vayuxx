@@ -296,3 +296,4 @@ void diagmem_exit(struct diagchar_dev *driver, int index)
 	}
 	spin_unlock_irqrestore(&mempool->lock, flags);
 }
+

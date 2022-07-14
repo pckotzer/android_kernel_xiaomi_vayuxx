@@ -56,7 +56,7 @@ static int stmmac_jumbo_frm(void *p, struct sk_buff *skb, int csum)
 
 	while (len != 0) {
 		tx_q->tx_skbuff[entry] = NULL;
-		entry = STMMAC_GET_ENTRY(entry, tx_q->dma_tx_desc_sz);
+		entry = STMMAC_GET_ENTRY(entry, DMA_TX_SIZE);
 		desc = tx_q->dma_tx + entry;
 
 		if (len > bmax) {
@@ -149,7 +149,7 @@ static void stmmac_refill_desc3(void *priv_ptr, struct dma_desc *p)
 		 */
 		p->des3 = cpu_to_le32((unsigned int)(rx_q->dma_rx_phy +
 				      (((rx_q->dirty_rx) + 1) %
-				       rx_q->dma_rx_desc_sz) *
+				       DMA_RX_SIZE) *
 				      sizeof(struct dma_desc)));
 }
 
@@ -166,8 +166,7 @@ static void stmmac_clean_desc3(void *priv_ptr, struct dma_desc *p)
 		 * to keep explicit chaining in the descriptor.
 		 */
 		p->des3 = cpu_to_le32((unsigned int)((tx_q->dma_tx_phy +
-				      ((tx_q->dirty_tx + 1) %
-				       tx_q->dma_tx_desc_sz))
+				      ((tx_q->dirty_tx + 1) % DMA_TX_SIZE))
 				      * sizeof(struct dma_desc)));
 }
 

@@ -1,4 +1,4 @@
-/* Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2018-2020, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -1700,11 +1700,11 @@ static ssize_t brake_pattern_dbgfs_write(struct file *filep,
 {
 	struct qti_hap_effect *effect =
 		(struct qti_hap_effect *)filep->private_data;
-	char *kbuf, *str, *token;
+	char *kbuf, *token;
 	int rc = 0, i = 0, j;
 	u32 val;
 
-	kbuf = kzalloc(count + 1, GFP_KERNEL);
+	kbuf = kmalloc(count + 1, GFP_KERNEL);
 	if (!kbuf)
 		return -ENOMEM;
 
@@ -1716,8 +1716,8 @@ static ssize_t brake_pattern_dbgfs_write(struct file *filep,
 
 	kbuf[count] = '\0';
 	*ppos += count;
-	str = kbuf;
-	while ((token = strsep(&str, " ")) != NULL) {
+
+	while ((token = strsep(&kbuf, " ")) != NULL) {
 		rc = kstrtouint(token, 0, &val);
 		if (rc < 0) {
 			rc = -EINVAL;
@@ -1783,11 +1783,11 @@ static ssize_t pattern_dbgfs_write(struct file *filep,
 {
 	struct qti_hap_effect *effect =
 		(struct qti_hap_effect *)filep->private_data;
-	char *kbuf, *str, *token;
+	char *kbuf, *token;
 	int rc = 0, i = 0, j;
 	u32 val;
 
-	kbuf = kzalloc(count + 1, GFP_KERNEL);
+	kbuf = kmalloc(count + 1, GFP_KERNEL);
 	if (!kbuf)
 		return -ENOMEM;
 
@@ -1799,8 +1799,8 @@ static ssize_t pattern_dbgfs_write(struct file *filep,
 
 	kbuf[count] = '\0';
 	*ppos += count;
-	str = kbuf;
-	while ((token = strsep(&str, " ")) != NULL) {
+
+	while ((token = strsep(&kbuf, " ")) != NULL) {
 		rc = kstrtouint(token, 0, &val);
 		if (rc < 0) {
 			rc = -EINVAL;

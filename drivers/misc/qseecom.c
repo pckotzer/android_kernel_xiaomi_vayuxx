@@ -454,29 +454,14 @@ static int get_qseecom_keymaster_status(char *str)
 }
 __setup("androidboot.keymaster=", get_qseecom_keymaster_status);
 
-static int __qseecom_alloc_coherent_buf(
-			uint32_t size, u8 **vaddr, phys_addr_t *paddr);
-static void __qseecom_free_coherent_buf(uint32_t size,
-				u8 *vaddr, phys_addr_t paddr);
 
 #define QSEECOM_SCM_EBUSY_WAIT_MS 30
 #define QSEECOM_SCM_EBUSY_MAX_RETRY 67
-
-#ifdef CONFIG_GHS_VMM
-struct device *qseecom_get_dev(void)
-{
-	return qseecom.dev;
-}
-EXPORT_SYMBOL(qseecom_get_dev);
-#endif /*CONFIG_GHS_VMM*/
 
 static int __qseecom_scm_call2_locked(uint32_t smc_id, struct scm_desc *desc)
 {
 	int ret = 0;
 	int retry_count = 0;
-
-	if (qseecom.support_bus_scaling)
-		return scm_call2(smc_id, desc);
 
 	do {
 		ret = scm_call2_noretry(smc_id, desc);
@@ -3580,8 +3565,7 @@ int __qseecom_process_reentrancy(struct qseecom_command_scm_resp *resp,
 }
 
 static int __qseecom_send_cmd(struct qseecom_dev_handle *data,
-			struct qseecom_send_cmd_req *req,
-			bool is_phys_adr)
+				struct qseecom_send_cmd_req *req)
 {
 	int ret = 0;
 	u32 reqd_len_sb_in = 0;
@@ -3623,20 +3607,11 @@ static int __qseecom_send_cmd(struct qseecom_dev_handle *data,
 
 	if (qseecom.qsee_version < QSEE_VERSION_40) {
 		send_data_req.app_id = data->client.app_id;
-
-		if (!is_phys_adr) {
-			send_data_req.req_ptr =
-				(uint32_t)(__qseecom_uvirt_to_kphys
-				(data, (uintptr_t)req->cmd_req_buf));
-			send_data_req.rsp_ptr =
-				(uint32_t)(__qseecom_uvirt_to_kphys(
-				data, (uintptr_t)req->resp_buf));
-		} else {
-			send_data_req.req_ptr = (uint32_t)req->cmd_req_buf;
-			send_data_req.rsp_ptr = (uint32_t)req->resp_buf;
-		}
-
+		send_data_req.req_ptr = (uint32_t)(__qseecom_uvirt_to_kphys(
+					data, (uintptr_t)req->cmd_req_buf));
 		send_data_req.req_len = req->cmd_req_len;
+		send_data_req.rsp_ptr = (uint32_t)(__qseecom_uvirt_to_kphys(
+					data, (uintptr_t)req->resp_buf));
 		send_data_req.rsp_len = req->resp_len;
 		send_data_req.sglistinfo_ptr =
 				(uint32_t)virt_to_phys(table);
@@ -3647,21 +3622,11 @@ static int __qseecom_send_cmd(struct qseecom_dev_handle *data,
 		cmd_len = sizeof(struct qseecom_client_send_data_ireq);
 	} else {
 		send_data_req_64bit.app_id = data->client.app_id;
-
-		if (!is_phys_adr) {
-			send_data_req_64bit.req_ptr =
-				 __qseecom_uvirt_to_kphys(data,
-				(uintptr_t)req->cmd_req_buf);
-			send_data_req_64bit.rsp_ptr =
-				__qseecom_uvirt_to_kphys(data,
-				(uintptr_t)req->resp_buf);
-		} else {
-			send_data_req_64bit.req_ptr =
-				(uintptr_t)req->cmd_req_buf;
-			send_data_req_64bit.rsp_ptr =
-				(uintptr_t)req->resp_buf;
-		}
+		send_data_req_64bit.req_ptr = __qseecom_uvirt_to_kphys(data,
+					(uintptr_t)req->cmd_req_buf);
 		send_data_req_64bit.req_len = req->cmd_req_len;
+		send_data_req_64bit.rsp_ptr = __qseecom_uvirt_to_kphys(data,
+					(uintptr_t)req->resp_buf);
 		send_data_req_64bit.rsp_len = req->resp_len;
 		/* check if 32bit app's phys_addr region is under 4GB.*/
 		if ((data->client.app_arch == ELFCLASS32) &&
@@ -3758,7 +3723,7 @@ static int qseecom_send_cmd(struct qseecom_dev_handle *data, void __user *argp)
 	if (__validate_send_cmd_inputs(data, &req))
 		return -EINVAL;
 
-	ret = __qseecom_send_cmd(data, &req, false);
+	ret = __qseecom_send_cmd(data, &req);
 
 	if (ret)
 		return ret;
@@ -4248,9 +4213,6 @@ static int __qseecom_send_modfd_cmd(struct qseecom_dev_handle *data,
 	int i;
 	struct qseecom_send_modfd_cmd_req req;
 	struct qseecom_send_cmd_req send_cmd_req;
-	void *origin_req_buf_kvirt, *origin_rsp_buf_kvirt;
-	phys_addr_t pa;
-	u8 *va = NULL;
 
 	ret = copy_from_user(&req, argp, sizeof(req));
 	if (ret) {
@@ -4274,56 +4236,32 @@ static int __qseecom_send_modfd_cmd(struct qseecom_dev_handle *data,
 			return -EINVAL;
 		}
 	}
-
-	/*Back up original address */
-	origin_req_buf_kvirt = (void *)__qseecom_uvirt_to_kvirt(data,
-				(uintptr_t)req.cmd_req_buf);
-	origin_rsp_buf_kvirt = (void *)__qseecom_uvirt_to_kvirt(data,
-				(uintptr_t)req.resp_buf);
-
-	/* Allocate kernel buffer for request and response*/
-	ret = __qseecom_alloc_coherent_buf(req.cmd_req_len + req.resp_len,
-					&va, &pa);
-	req.cmd_req_buf = va;
-	send_cmd_req.cmd_req_buf = (void *)pa;
-
-	req.resp_buf = va + req.cmd_req_len;
-	send_cmd_req.resp_buf = (void *)pa + req.cmd_req_len;
-
-	/* Copy the data to kernel request and response buffers*/
-	memcpy(req.cmd_req_buf, origin_req_buf_kvirt, req.cmd_req_len);
-	memcpy(req.resp_buf, origin_rsp_buf_kvirt, req.resp_len);
+	req.cmd_req_buf = (void *)__qseecom_uvirt_to_kvirt(data,
+						(uintptr_t)req.cmd_req_buf);
+	req.resp_buf = (void *)__qseecom_uvirt_to_kvirt(data,
+						(uintptr_t)req.resp_buf);
 
 	if (!is_64bit_addr) {
 		ret = __qseecom_update_cmd_buf(&req, false, data);
 		if (ret)
-			goto out;
-		ret = __qseecom_send_cmd(data, &send_cmd_req, true);
+			return ret;
+		ret = __qseecom_send_cmd(data, &send_cmd_req);
 		if (ret)
-			goto out;
+			return ret;
 		ret = __qseecom_update_cmd_buf(&req, true, data);
 		if (ret)
-			goto out;
+			return ret;
 	} else {
 		ret = __qseecom_update_cmd_buf_64(&req, false, data);
 		if (ret)
-			goto out;
-		ret = __qseecom_send_cmd(data, &send_cmd_req, true);
+			return ret;
+		ret = __qseecom_send_cmd(data, &send_cmd_req);
 		if (ret)
-			goto out;
+			return ret;
 		ret = __qseecom_update_cmd_buf_64(&req, true, data);
 		if (ret)
-			goto out;
+			return ret;
 	}
-
-	/*Copy the response back to the userspace buffer*/
-	memcpy(origin_rsp_buf_kvirt, req.resp_buf, req.resp_len);
-	memcpy(origin_req_buf_kvirt, req.cmd_req_buf, req.cmd_req_len);
-
-out:
-	if (req.cmd_req_buf)
-		__qseecom_free_coherent_buf(req.cmd_req_len + req.resp_len,
-			req.cmd_req_buf, (phys_addr_t)send_cmd_req.cmd_req_buf);
 
 	return ret;
 }
@@ -5194,7 +5132,7 @@ int qseecom_send_command(struct qseecom_handle *handle, void *send_buf,
 
 	dmac_flush_range(req.cmd_req_buf, req.cmd_req_buf + req.cmd_req_len);
 
-	ret = __qseecom_send_cmd(data, &req, false);
+	ret = __qseecom_send_cmd(data, &req);
 
 	dmac_flush_range(req.resp_buf, req.resp_buf + req.resp_len);
 
@@ -9369,7 +9307,7 @@ static int qseecom_probe(struct platform_device *pdev)
 						UNLOAD_APP_KT_SLEEP);
 
 	if (!qseecom.qsee_perf_client)
-		pr_debug("Unable to register bus client\n");
+		pr_err("Unable to register bus client\n");
 
 	atomic_set(&qseecom.qseecom_state, QSEECOM_STATE_READY);
 	return 0;
@@ -9545,7 +9483,7 @@ static int qseecom_suspend(struct platform_device *pdev, pm_message_t state)
 
 static int qseecom_resume(struct platform_device *pdev)
 {
-	int mode = LOW;
+	int mode = 0;
 	int ret = 0;
 	struct qseecom_clk *qclk;
 
@@ -9555,6 +9493,10 @@ static int qseecom_resume(struct platform_device *pdev)
 
 	mutex_lock(&qsee_bw_mutex);
 	mutex_lock(&clk_access_lock);
+	if (qseecom.cumulative_mode >= HIGH)
+		mode = HIGH;
+	else
+		mode = qseecom.cumulative_mode;
 
 	if (qseecom.cumulative_mode != INACTIVE) {
 		ret = msm_bus_scale_client_update_request(

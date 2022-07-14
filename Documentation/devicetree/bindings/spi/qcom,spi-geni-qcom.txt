@@ -56,10 +56,7 @@ Optional properties:
 - slv-cross-connected : Set this flag only when SPI-Slave MISO pin is connected
 			to SPI-Master MOSI and vice-versa .
 
-- qcom,use-fixed-timeout : Set this flag to use 250ms fixed timeout value. This
-			   will improve overall SPI KPI value but not preferred
-			   for large transfer.
-
+Other optional properties described in
 Documentation/devicetree/bindings/spi/spi-bus.txt
 
 Example:

@@ -1,4 +1,4 @@
-/* Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2016-2020, The Linux Foundation. All rights reserved.
  * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
@@ -80,7 +80,6 @@ struct crm_task_payload {
 	enum crm_workq_task_type type;
 	union {
 		struct cam_req_mgr_sched_request        sched_req;
-		struct cam_req_mgr_sched_request_v2     sched_req_v2;
 		struct cam_req_mgr_flush_info           flush_info;
 		struct cam_req_mgr_add_request          dev_req;
 		struct cam_req_mgr_send_request         send_req;
@@ -228,7 +227,6 @@ struct cam_req_mgr_req_tbl {
  * @recover      : if user enabled recovery for this request.
  * @req_id       : mask tracking which all devices have request ready
  * @sync_mode    : Sync mode in which req id in this slot has to applied
- * @sof_timeout  : sof timeout for this slot
  */
 struct cam_req_mgr_slot {
 	int32_t               idx;
@@ -237,7 +235,6 @@ struct cam_req_mgr_slot {
 	int32_t               recover;
 	int64_t               req_id;
 	int32_t               sync_mode;
-	int32_t               sof_timeout;
 };
 
 /**
@@ -465,15 +462,6 @@ int cam_req_mgr_unlink(struct cam_req_mgr_unlink_info *unlink_info);
  */
 int cam_req_mgr_schedule_request(
 	struct cam_req_mgr_sched_request *sched_req);
-
-/**
- * cam_req_mgr_schedule_request_v2()
- * @brief: Request is scheduled
- * @sched_req: request id, session and link id info, bubble recovery info
- * reserved field
- */
-int cam_req_mgr_schedule_request_v2(
-	struct cam_req_mgr_sched_request_v2 *sched_req);
 
 /**
  * cam_req_mgr_sync_mode_setup()

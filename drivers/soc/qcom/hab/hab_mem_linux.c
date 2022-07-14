@@ -1,4 +1,4 @@
-/* Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2016-2020, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -37,12 +37,6 @@ struct importer_context {
 	struct file *filp;
 };
 
-struct exp_platform_data {
-	void *dmabuf;
-	void *attach;
-	void *sg_table;
-};
-
 static struct dma_buf_ops dma_buf_ops;
 
 static struct pages_list *pages_list_create(
@@ -68,13 +62,13 @@ static struct pages_list *pages_list_create(
 	}
 
 	size = exp->payload_count * sizeof(struct page *);
-	pages = vmalloc(size);
+	pages = kmalloc(size, GFP_KERNEL);
 	if (!pages)
 		return ERR_PTR(-ENOMEM);
 
 	pglist = kzalloc(sizeof(*pglist), GFP_KERNEL);
 	if (!pglist) {
-		vfree(pages);
+		kfree(pages);
 		return ERR_PTR(-ENOMEM);
 	}
 
@@ -128,7 +122,7 @@ static void pages_list_destroy(struct kref *refcount)
 	if (pglist->type == HAB_PAGE_LIST_IMPORT)
 		pages_list_remove(pglist);
 
-	vfree(pglist->pages);
+	kfree(pglist->pages);
 
 	kfree(pglist);
 }
@@ -223,7 +217,7 @@ static struct dma_buf *habmem_get_dma_buf_from_uva(unsigned long address,
 	struct pages_list *pglist = NULL;
 	DEFINE_DMA_BUF_EXPORT_INFO(exp_info);
 
-	pages = vmalloc((page_count * sizeof(struct page *)));
+	pages = kmalloc_array(page_count, sizeof(struct page *), GFP_KERNEL);
 	if (!pages) {
 		ret = -ENOMEM;
 		goto err;
@@ -270,7 +264,7 @@ static struct dma_buf *habmem_get_dma_buf_from_uva(unsigned long address,
 	return dmabuf;
 
 err:
-	vfree(pages);
+	kfree(pages);
 	kfree(pglist);
 	return ERR_PTR(ret);
 }
@@ -281,10 +275,7 @@ static int habmem_compress_pfns(
 		uint32_t *data_size)
 {
 	int ret = 0;
-	struct exp_platform_data *platform_data =
-		(struct exp_platform_data *) exp_super->platform_data;
-	struct dma_buf *dmabuf =
-		(struct dma_buf *) platform_data->dmabuf;
+	struct dma_buf *dmabuf = exp_super->platform_data;
 	int page_count = exp_super->exp.payload_count;
 	struct pages_list *pglist = NULL;
 	struct page **pages = NULL;
@@ -316,9 +307,6 @@ static int habmem_compress_pfns(
 			goto err;
 		}
 
-		/* Restore sg table and attach of dmabuf */
-		platform_data->attach = attach;
-		platform_data->sg_table = sg_table;
 		page_offset = exp_super->offset >> PAGE_SHIFT;
 
 		for_each_sg(sg_table->sgl, s, sg_table->nents, i) {
@@ -378,14 +366,24 @@ static int habmem_compress_pfns(
 	*data_size = sizeof(struct compressed_pfns) +
 		sizeof(struct region) * pfns->nregions;
 
-	return 0;
 err:
-	if (!IS_ERR_OR_NULL(attach)) {
-		if (!IS_ERR_OR_NULL(sg_table))
-			dma_buf_unmap_attachment(attach,
-					sg_table,
-					DMA_TO_DEVICE);
+	if (!IS_ERR_OR_NULL(sg_table))
+		dma_buf_unmap_attachment(attach, sg_table, DMA_TO_DEVICE);
+
+	if (!IS_ERR_OR_NULL(attach))
 		dma_buf_detach(dmabuf, attach);
+
+	/* TODO: This dma buffer should not be put here,
+	 * but currently display is depended on this put to do recircle,
+	 * so we just put dma buffer here to ensure there is no memleak.
+	 * we can remove this after display have a fix.
+	 */
+	if (HABMM_EXP_MEM_TYPE_DMA & exp_super->exp.readonly) {
+		if (!IS_ERR_OR_NULL(dmabuf)
+				&& dmabuf->ops != &dma_buf_ops) {
+			dma_buf_put(dmabuf);
+			exp_super->platform_data = NULL;
+		}
 	}
 
 	return ret;
@@ -402,7 +400,6 @@ static int habmem_add_export_compress(struct virtual_channel *vchan,
 	int ret = 0;
 	struct export_desc *exp = NULL;
 	struct export_desc_super *exp_super = NULL;
-	struct exp_platform_data *platform_data = NULL;
 	struct compressed_pfns *pfns = NULL;
 	uint32_t sizebytes = sizeof(*exp_super) +
 				sizeof(struct compressed_pfns) +
@@ -411,42 +408,29 @@ static int habmem_add_export_compress(struct virtual_channel *vchan,
 	exp_super = habmem_add_export(vchan,
 			sizebytes,
 			flags);
-	if (IS_ERR_OR_NULL(exp_super)) {
+	if (!exp_super) {
+		dma_buf_put((struct dma_buf *)buf);
 		ret = -ENOMEM;
-		goto err_add_exp;
+		goto err;
 	}
-	platform_data = kzalloc(
-			sizeof(struct exp_platform_data),
-			GFP_KERNEL);
-	if (!platform_data) {
-		ret = -ENOMEM;
-		goto err_alloc;
-	}
-
 	exp = &exp_super->exp;
 	exp->payload_count = page_count;
-	platform_data->dmabuf = buf;
+	exp_super->platform_data = buf;
 	exp_super->offset = offset;
-	exp_super->platform_data = (void *)platform_data;
 	kref_init(&exp_super->refcount);
 
 	pfns = (struct compressed_pfns *)&exp->payload[0];
 	ret = habmem_compress_pfns(exp_super, pfns, payload_size);
 	if (ret) {
 		pr_err("hab compressed pfns failed %d\n", ret);
+		kfree(exp_super);
+		dma_buf_put((struct dma_buf *)buf);
 		*payload_size = 0;
-		goto err_compress_pfns;
+		goto err;
 	}
 
 	*export_id = exp->export_id;
-	return 0;
-
-err_compress_pfns:
-	kfree(platform_data);
-err_alloc:
-	vfree(exp_super);
-err_add_exp:
-	dma_buf_put((struct dma_buf *)buf);
+err:
 	return ret;
 }
 
@@ -521,8 +505,9 @@ int habmem_hyp_grant(struct virtual_channel *vchan,
 	} else if (HABMM_EXPIMP_FLAGS_FD & flags)
 		dmabuf = dma_buf_get(address);
 	else { /*Input is kva;*/
-		pages = vmalloc((page_count *
-				sizeof(struct page *)));
+		pages = kmalloc_array(page_count,
+				sizeof(struct page *),
+				GFP_KERNEL);
 		if (!pages) {
 			ret = -ENOMEM;
 			goto err;
@@ -573,35 +558,21 @@ int habmem_hyp_grant(struct virtual_channel *vchan,
 
 	return ret;
 err:
-	vfree(pages);
+	kfree(pages);
 	kfree(pglist);
 	return ret;
 }
 
 int habmem_exp_release(struct export_desc_super *exp_super)
 {
-	struct exp_platform_data *platform_data =
-		(struct exp_platform_data *)exp_super->platform_data;
 	struct dma_buf *dmabuf =
-		(struct dma_buf *) platform_data->dmabuf;
-	struct dma_buf_attachment *attach = NULL;
-	struct sg_table *sg_table = NULL;
+			(struct dma_buf *) exp_super->platform_data;
 
-	if (!IS_ERR_OR_NULL(dmabuf)) {
-		attach = (struct dma_buf_attachment *) platform_data->attach;
-		if (!IS_ERR_OR_NULL(attach)) {
-			sg_table = (struct sg_table *) platform_data->sg_table;
-			if (!IS_ERR_OR_NULL(sg_table))
-				dma_buf_unmap_attachment(attach,
-						sg_table,
-						DMA_TO_DEVICE);
-			dma_buf_detach(dmabuf, attach);
-		}
+	if (!IS_ERR_OR_NULL(dmabuf))
 		dma_buf_put(dmabuf);
-	} else
+	else
 		pr_debug("release failed, dmabuf is null!!!\n");
 
-	kfree(platform_data);
 	return 0;
 }
 
