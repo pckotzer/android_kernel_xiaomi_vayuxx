@@ -53,12 +53,14 @@
 #include "ufs-debugfs.h"
 #include "ufs-qcom.h"
 
+#if 0
 static bool ufshcd_wb_sup(struct ufs_hba *hba);
 static int ufshcd_wb_ctrl(struct ufs_hba *hba, bool enable);
 static int ufshcd_wb_buf_flush_enable(struct ufs_hba *hba);
 static int ufshcd_wb_buf_flush_disable(struct ufs_hba *hba);
 static bool ufshcd_wb_is_buf_flush_needed(struct ufs_hba *hba);
 static int ufshcd_wb_toggle_flush_during_h8(struct ufs_hba *hba, bool set);
+#endif
 
 #ifdef CONFIG_DEBUG_FS
 
@@ -235,7 +237,7 @@ static void ufshcd_update_uic_error_cnt(struct ufs_hba *hba, u32 reg, int type)
 #define QUERY_REQ_TIMEOUT 3000 /* 3.0 seconds */
 
 /* Task management command timeout */
-#define TM_CMD_TIMEOUT	100 /* msecs */
+#define TM_CMD_TIMEOUT	500 /* msecs */
 
 /* maximum number of retries for a general UIC command  */
 #define UFS_UIC_COMMAND_RETRIES 3
@@ -369,12 +371,7 @@ ufs_get_pm_lvl_to_link_pwr_state(enum ufs_pm_level lvl)
 	return ufs_pm_lvl_states[lvl].link_state;
 }
 
-#if 1
-static inline void ufshcd_wb_toggle_flush(struct ufs_hba *hba)
-{
-	return;
-}
-#else
+#if 0
 static inline void ufshcd_wb_toggle_flush(struct ufs_hba *hba)
 {
 	/*
@@ -390,12 +387,7 @@ static inline void ufshcd_wb_toggle_flush(struct ufs_hba *hba)
 }
 #endif
 
-#if 1
-static inline void ufshcd_wb_config(struct ufs_hba *hba)
-{
-	return;
-}
-#else
+#if 0
 static inline void ufshcd_wb_config(struct ufs_hba *hba)
 {
 	int ret;
@@ -486,6 +478,8 @@ static struct ufs_dev_fix ufs_fixups[] = {
 	UFS_FIX(UFS_VENDOR_SKHYNIX, UFS_ANY_MODEL,
 		UFS_DEVICE_QUIRK_HOST_PA_SAVECONFIGTIME),
 	UFS_FIX(UFS_VENDOR_SKHYNIX, UFS_ANY_MODEL,
+		UFS_DEVICE_QUIRK_WAIT_AFTER_REF_CLK_UNGATE),
+	UFS_FIX(UFS_VENDOR_MICRON, UFS_ANY_MODEL,
 		UFS_DEVICE_QUIRK_WAIT_AFTER_REF_CLK_UNGATE),
 	UFS_FIX(UFS_VENDOR_SKHYNIX, "hB8aL1",
 		UFS_DEVICE_QUIRK_HS_G1_TO_HS_G3_SWITCH),
@@ -1807,7 +1801,7 @@ out:
 
 static int ufshcd_clock_scaling_prepare(struct ufs_hba *hba)
 {
-	#define DOORBELL_CLR_TOUT_US		(1000 * 1000) /* 1 sec */
+	#define DOORBELL_CLR_TOUT_US		(40*1000*1000) /* 40 sec */
 	int ret = 0;
 	/*
 	 * make sure that there are no outstanding requests when
@@ -1912,7 +1906,9 @@ static int ufshcd_devfreq_scale(struct ufs_hba *hba, bool scale_up)
 
 	/* Enable Write Booster if we have scaled up else disable it */
 	up_write(&hba->lock);
+#if 0
 	ufshcd_wb_ctrl(hba, scale_up);
+#endif
 	down_write(&hba->lock);
 	goto clk_scaling_unprepare;
 
@@ -2617,8 +2613,8 @@ static void ufshcd_init_clk_gating(struct ufs_hba *hba)
 
 	snprintf(wq_name, ARRAY_SIZE(wq_name), "ufs_clk_gating_%d",
 			hba->host->host_no);
-	hba->clk_gating.clk_gating_workq =
-		create_singlethread_workqueue(wq_name);
+	hba->clk_gating.clk_gating_workq = alloc_ordered_workqueue(wq_name,
+					WQ_MEM_RECLAIM | WQ_HIGHPRI);
 
 	gating->is_enabled = true;
 
@@ -2970,7 +2966,6 @@ static void ufshcd_hibern8_on_idle_switch_work(struct work_struct *work)
 	}
 
 	hba->hibern8_on_idle.is_enabled = value;
-out:
 	return;
 }
 
@@ -7083,12 +7078,7 @@ out:
 				__func__, err);
 }
 
-#if 1
-static bool ufshcd_wb_sup(struct ufs_hba *hba)
-{
-	return false;
-}
-#else
+#if 0
 static bool ufshcd_wb_sup(struct ufs_hba *hba)
 {
 #if defined(CONFIG_UFSTW)
@@ -7106,12 +7096,7 @@ static bool ufshcd_wb_sup(struct ufs_hba *hba)
 }
 #endif
 
-#if 1
-static int ufshcd_wb_ctrl(struct ufs_hba *hba, bool enable)
-{
-	return 1;
-}
-#else
+#if 0
 static int ufshcd_wb_ctrl(struct ufs_hba *hba, bool enable)
 {
 	int ret;
@@ -7141,12 +7126,7 @@ static int ufshcd_wb_ctrl(struct ufs_hba *hba, bool enable)
 }
 #endif
 
-#if 1
-static int ufshcd_wb_toggle_flush_during_h8(struct ufs_hba *hba, bool set)
-{
-	return 1;
-}
-#else
+#if 0
 static int ufshcd_wb_toggle_flush_during_h8(struct ufs_hba *hba, bool set)
 {
 	int val, ret;
@@ -7169,12 +7149,7 @@ static int ufshcd_wb_toggle_flush_during_h8(struct ufs_hba *hba, bool set)
 }
 #endif
 
-#if 1
-static int ufshcd_wb_buf_flush_enable(struct ufs_hba *hba)
-{
-	return 0;
-}
-#else
+#if 0
 static int ufshcd_wb_buf_flush_enable(struct ufs_hba *hba)
 {
 	int ret;
@@ -7193,12 +7168,7 @@ static int ufshcd_wb_buf_flush_enable(struct ufs_hba *hba)
 }
 #endif
 
-#if 1
-static int ufshcd_wb_buf_flush_disable(struct ufs_hba *hba)
-{
-	return 0;
-}
-#else
+#if 0
 static int ufshcd_wb_buf_flush_disable(struct ufs_hba *hba)
 {
 	int ret;
@@ -7217,12 +7187,7 @@ static int ufshcd_wb_buf_flush_disable(struct ufs_hba *hba)
 }
 #endif
 
-#if 1
-static bool ufshcd_wb_is_buf_flush_needed(struct ufs_hba *hba)
-{
-	return false;
-}
-#else
+#if 0
 static bool ufshcd_wb_is_buf_flush_needed(struct ufs_hba *hba)
 {
 	int ret;
@@ -9406,7 +9371,9 @@ reinit:
 	/* set the state as operational after switching to desired gear */
 	hba->ufshcd_state = UFSHCD_STATE_OPERATIONAL;
 
+#if 0
 	ufshcd_wb_config(hba);
+#endif
 
 	/*
 	 * If we are in error handling context or in power management callbacks
@@ -10786,9 +10753,13 @@ static int ufshcd_suspend(struct ufs_hba *hba, enum ufs_pm_op pm_op)
 			/* make sure that auto bkops is disabled */
 			ufshcd_disable_auto_bkops(hba);
 		}
+#if 0
 		ufshcd_wb_toggle_flush(hba);
+#endif
 	} else if (!ufshcd_is_runtime_pm(pm_op)) {
+#if 0
 		ufshcd_wb_buf_flush_disable(hba);
+#endif
 		hba->dev_info.keep_vcc_on = false;
 	}
 
@@ -10990,7 +10961,9 @@ static inline int __ufshcd_resume(struct ufs_hba *hba, enum ufs_pm_op pm_op)
 			hba->hibern8_on_idle.state = HIBERN8_EXITED;
 	}
 
+#if 0
 	ufshcd_wb_buf_flush_disable(hba);
+#endif
 	if (!ufshcd_is_ufs_dev_active(hba)) {
 		ret = ufshcd_set_dev_pwr_mode(hba, UFS_ACTIVE_PWR_MODE);
 		if (ret)
