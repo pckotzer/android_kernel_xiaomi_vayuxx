@@ -1775,7 +1775,8 @@ composite_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 			__le16 *temp = (__le16 *)&ctrl->wLength;
 
 			*temp = cpu_to_le16(USB_COMP_EP0_BUFSIZ);
-			w_length = USB_COMP_EP0_BUFSIZ;}
+			w_length = USB_COMP_EP0_BUFSIZ;
+		}
 	}
 
 	/* partial re-init of the response message; the function or the
