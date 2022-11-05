@@ -42,9 +42,6 @@
 #endif
 
 #include "nt36xxx.h"
-#ifndef NVT_SAVE_TESTDATA_IN_FILE
-#include "nt36xxx_mp_ctrlram.h"
-#endif
 #if NVT_TOUCH_ESD_PROTECT
 #include <linux/jiffies.h>
 #endif /* #if NVT_TOUCH_ESD_PROTECT */
@@ -95,11 +92,6 @@ extern int32_t nvt_extra_proc_init(void);
 extern void nvt_extra_proc_deinit(void);
 #endif
 
-#if NVT_TOUCH_MP
-extern int32_t nvt_mp_proc_init(void);
-extern void nvt_mp_proc_deinit(void);
-#endif
-
 struct nvt_ts_data *ts;
 
 #if BOOT_UPDATE_FIRMWARE
@@ -126,37 +118,6 @@ static int32_t nvt_check_palm(uint8_t input_id, uint8_t *data);
 uint32_t ENG_RST_ADDR  = 0x7FFF80;
 uint32_t SWRST_N8_ADDR = 0; /* read from dtsi */
 uint32_t SPI_RD_FAST_ADDR = 0; /* read from dtsi */
-
-#ifdef CONFIG_MTK_SPI
-const struct mt_chip_conf spi_ctrdata = {
-	.setuptime = 25,
-	.holdtime = 25,
-	.high_time = 5,	/* 10MHz (SPI_SPEED=100M / (high_time+low_time(10ns)))*/
-	.low_time = 5,
-	.cs_idletime = 2,
-	.ulthgh_thrsh = 0,
-	.cpol = 0,
-	.cpha = 0,
-	.rx_mlsb = 1,
-	.tx_mlsb = 1,
-	.tx_endian = 0,
-	.rx_endian = 0,
-	.com_mod = DMA_TRANSFER,
-	.pause = 0,
-	.finish_intr = 1,
-	.deassert = 0,
-	.ulthigh = 0,
-	.tckdly = 0,
-};
-#endif  /*endif CONFIG_MTK_SPI*/
-
-#ifdef CONFIG_SPI_MT65XX
-const struct mtk_chip_config spi_ctrdata = {
-	.rx_mlsb = 1,
-	.tx_mlsb = 1,
-	.cs_pol = 0,
-};
-#endif  /*endif CONFIG_SPI_MT65XX*/
 
 #ifdef CONFIG_TOUCHSCREEN_COMMON
 static ssize_t double_tap_show(struct kobject *kobj,
@@ -2391,18 +2352,6 @@ static int32_t nvt_ts_probe(struct platform_device *pdev)
 		goto err_spi_setup;
 	}
 
-#ifdef CONFIG_MTK_SPI
-	/* old usage of MTK spi API */
-	memcpy(&ts->spi_ctrl, &spi_ctrdata, sizeof(struct mt_chip_conf));
-	ts->client->controller_data = (void *)&ts->spi_ctrl;
-#endif
-
-#ifdef CONFIG_SPI_MT65XX
-	/* new usage of MTK spi API */
-	memcpy(&ts->spi_ctrl, &spi_ctrdata, sizeof(struct mtk_chip_config));
-	ts->client->controller_data = (void *)&ts->spi_ctrl;
-#endif
-
 	NVT_LOG("mode=%d, max_speed_hz=%d\n", ts->client->mode, ts->client->max_speed_hz);
 
 	ret = nvt_pinctrl_init(ts);
@@ -2585,26 +2534,10 @@ static int32_t nvt_ts_probe(struct platform_device *pdev)
 	}
 #endif
 
-#if NVT_TOUCH_MP
-	ret = nvt_mp_proc_init();
-	if (ret != 0) {
-		NVT_ERR("nvt mp proc init failed. ret=%d\n", ret);
-		goto err_mp_proc_init_failed;
-	}
-
-#ifndef NVT_SAVE_TESTDATA_IN_FILE
-	ret = nvt_test_data_proc_init(ts->client);
-	if (ret < 0) {
-		NVT_ERR("nvt test data interface init failed. ret=%d\n", ret);
-		goto err_mp_proc_init_failed;
-	}
-#endif
-
-#endif
 	attrs_p = (struct attribute_group *)devm_kzalloc(&pdev->dev, sizeof(*attrs_p), GFP_KERNEL);
 	if (!attrs_p) {
 		NVT_ERR("no mem to alloc");
-		goto err_mp_proc_init_failed;
+		goto err_alloc_failed;
 	}
 	ts->attrs = attrs_p;
 	attrs_p->name = "panel_info";
@@ -2616,7 +2549,7 @@ static int32_t nvt_ts_probe(struct platform_device *pdev)
 	if (!ts->event_wq) {
 		NVT_ERR("Can not create work thread for suspend/resume!!");
 		ret = -ENOMEM;
-		goto err_alloc_work_thread_failed;
+		goto err_alloc_failed;
 	}
 	INIT_WORK(&ts->resume_work, nvt_resume_work);
 	/*INIT_WORK(&ts->suspend_work, nvt_suspend_work);*/
@@ -2689,11 +2622,7 @@ err_register_fb_notif_failed:
 err_register_early_suspend_failed:
 #endif
 	destroy_workqueue(ts->event_wq);
-err_alloc_work_thread_failed:
-#if NVT_TOUCH_MP
-nvt_mp_proc_deinit();
-err_mp_proc_init_failed:
-#endif
+err_alloc_failed:
 #if NVT_TOUCH_EXT_PROC
 nvt_extra_proc_deinit();
 err_extra_proc_init_failed:
@@ -2780,12 +2709,6 @@ static int32_t nvt_ts_remove(struct platform_device *pdev)
 #if defined(CONFIG_HAS_EARLYSUSPEND)
 	unregister_early_suspend(&ts->early_suspend);
 #endif
-#ifndef NVT_SAVE_TESTDATA_IN_FILE
-	nvt_test_data_proc_deinit();
-#endif
-#if NVT_TOUCH_MP
-	nvt_mp_proc_deinit();
-#endif
 #if NVT_TOUCH_EXT_PROC
 	nvt_extra_proc_deinit();
 #endif
@@ -2853,9 +2776,6 @@ static void nvt_ts_shutdown(struct platform_device *pdev)
 #endif
 #if defined(CONFIG_HAS_EARLYSUSPEND)
 	unregister_early_suspend(&ts->early_suspend);
-#endif
-#if NVT_TOUCH_MP
-	nvt_mp_proc_deinit();
 #endif
 #if NVT_TOUCH_EXT_PROC
 	nvt_extra_proc_deinit();
