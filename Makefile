@@ -369,8 +369,8 @@ else
 HOSTCC	= $(CCACHE) gcc
 HOSTCXX	= $(CCACHE) g++
 endif
-HOSTCFLAGS   := -Wall -Wmissing-prototypes -Wstrict-prototypes -O3 -ffast-math -fomit-frame-pointer -std=gnu89 -fPIE -pipe $(HOST_LFS_CFLAGS)
-HOSTCXXFLAGS := -O3 -ffast-math $(HOST_LFS_CFLAGS)
+HOSTCFLAGS   := -Wall -Wmissing-prototypes -Wstrict-prototypes -O3 -fomit-frame-pointer -std=gnu89 -fPIE -pipe $(HOST_LFS_CFLAGS)
+HOSTCXXFLAGS := -O3 $(HOST_LFS_CFLAGS)
 HOSTLDFLAGS  := $(HOST_LFS_LDFLAGS)
 HOST_LOADLIBES := $(HOST_LFS_LIBS)
 
@@ -461,7 +461,7 @@ KBUILD_CFLAGS	+= -mllvm -polly \
 		   -mllvm -polly-detect-keep-going \
 		   -mllvm -polly-vectorizer=stripmine \
 		   -mllvm -polly-invariant-load-hoisting
-KBUILD_CFLAGS	+= -pipe -fno-pic -O3 -ffast-math -g0 -finline-functions
+KBUILD_CFLAGS	+= -pipe -fno-pic -O3 -g0 -finline-functions
 KBUILD_CFLAGS	+= -mcpu=cortex-a55+crc+lse+fp16+rcpc+rdma+dotprod -mtune=cortex-a55
 KBUILD_CFLAGS	+= -mcpu=cortex-a76+crc+lse+fp16+rcpc+rdma+dotprod -mtune=cortex-a76
 KBUILD_CFLAGS	+= -march=armv8.2-a+crypto
