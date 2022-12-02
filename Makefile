@@ -444,7 +444,7 @@ KBUILD_CFLAGS   := -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs -pipe \
 		   -Wno-format-security \
 		   -Wno-strlcpy-strlcat-size -Wno-excess-initializers -Wno-unused-variable \
 		   -Wno-void-pointer-to-int-cast -Wno-fortify-source -Wno-declaration-after-statement \
-		   -Wno-pointer-to-int-cast -Wno-macro-redefined \
+		   -Wno-pointer-to-int-cast -Wno-macro-redefined -Wno-void-ptr-dereference \
 		   -std=gnu89
 ifeq ($(TARGET_BOARD_TYPE),auto)
 KBUILD_CFLAGS    += -DCONFIG_PLATFORM_AUTO
@@ -455,12 +455,10 @@ KBUILD_CFLAGS    += -DCONFIG_EARLY_SERVICES
 endif
 
 KBUILD_CFLAGS	+= -mllvm -polly \
-		   -mllvm -polly-run-inliner \
-		   -mllvm -polly-isl-arg=--no-schedule-serialize-sccs \
 		   -mllvm -polly-ast-use-context \
-		   -mllvm -polly-detect-keep-going \
-		   -mllvm -polly-vectorizer=stripmine \
-		   -mllvm -polly-invariant-load-hoisting
+		   -mllvm -polly-invariant-load-hoisting \
+		   -mllvm -polly-run-inliner \
+		   -mllvm -polly-vectorizer=stripmine
 KBUILD_CFLAGS	+= -pipe -fno-pic -O3 -g0 -finline-functions
 KBUILD_CFLAGS	+= -mcpu=cortex-a55 -mtune=cortex-a55
 KBUILD_CFLAGS	+= -mcpu=cortex-a76 -mtune=cortex-a76
