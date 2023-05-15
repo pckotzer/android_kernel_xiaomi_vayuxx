@@ -467,9 +467,10 @@ KBUILD_CFLAGS	+= -mllvm -polly \
 		   -mllvm -polly-run-inliner \
 		   -mllvm -polly-vectorizer=stripmine
 KBUILD_CFLAGS	+= -pipe -fno-pic -O3 -g0 -finline-functions
-KBUILD_CFLAGS	+= -mcpu=cortex-a55+crypto -mtune=cortex-a55
-KBUILD_CFLAGS	+= -mcpu=cortex-a76+crypto -mtune=cortex-a76
 KBUILD_CFLAGS	+= -march=armv8.2-a+crypto
+# CPU flags minimum requirement Clang-16
+KBUILD_CFLAGS	+= -mcpu=cortex-a55+crypto+crc -mtune=cortex-a55
+KBUILD_CFLAGS	+= -mcpu=cortex-a76+crypto+crc -mtune=cortex-a76
 KBUILD_CPPFLAGS := -D__KERNEL__
 KBUILD_AFLAGS_KERNEL :=
 KBUILD_CFLAGS_KERNEL :=
